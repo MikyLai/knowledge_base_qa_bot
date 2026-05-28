@@ -53,6 +53,7 @@ jobs:
         
 
       - name: Install dependencies
+        working-directory: scaffold/markdown_kb
         run: pip install -r requirements.txt --target vendor/
     
       - name: Log in to GitHub Container Registry
