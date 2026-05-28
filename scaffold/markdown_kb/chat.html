@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>KB Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; height: 100vh; }
+    header { background: #1a1a2e; color: white; padding: 16px 24px; font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+    #health { font-size: 13px; font-weight: 400; display: flex; align-items: center; gap: 6px; }
+    #health-dot { width: 10px; height: 10px; border-radius: 50%; background: #888; display: inline-block; }
+    #health-dot.ok  { background: #2ecc71; }
+    #health-dot.err { background: #e74c3c; }
+    #messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .bubble { max-width: 720px; padding: 12px 16px; border-radius: 12px; line-height: 1.6; }
+    .user   { background: #1a1a2e; color: white; align-self: flex-end; border-radius: 12px 12px 2px 12px; }
+    .bot    { background: white; border: 1px solid #e0e0e0; align-self: flex-start; border-radius: 12px 12px 12px 2px; }
+    .sources { margin-top: 10px; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px; }
+    .source-item { margin-top: 4px; }
+    .source-item code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+    .error { color: #c0392b; }
+    #input-row { display: flex; padding: 16px; gap: 8px; background: white; border-top: 1px solid #e0e0e0; }
+    #query { flex: 1; padding: 10px 14px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
+    button { padding: 10px 20px; background: #1a1a2e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .thinking { color: #999; font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Knowledge Base Chat</span>
+    <span id="health"><span id="health-dot"></span><span id="health-text">checking...</span></span>
+  </header>
+  <div id="messages"></div>
+  <div id="input-row">
+    <input id="query" type="text" placeholder="Ask a question..." autofocus />
+    <button id="send">Send</button>
+  </div>
+
+  <script>
+    const API = "http://localhost:8000";
+
+    async function checkHealth() {
+      const dot = document.getElementById("health-dot");
+      const text = document.getElementById("health-text");
+      try {
+        const res = await fetch(`${API}/health`);
+        if (res.ok) {
+          dot.className = "ok"; text.textContent = "server ok";
+        } else {
+          dot.className = "err"; text.textContent = "server error";
+        }
+      } catch {
+        dot.className = "err"; text.textContent = "unreachable";
+      }
+    }
+    checkHealth();
+    setInterval(checkHealth, 10000);
+    const messages = document.getElementById("messages");
+    const queryInput = document.getElementById("query");
+    const sendBtn = document.getElementById("send");
+
+    function addBubble(cls, html) {
+      const div = document.createElement("div");
+      div.className = `bubble ${cls}`;
+      div.innerHTML = html;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+      return div;
+    }
+
+    async function sendMessage() {
+      const q = queryInput.value.trim();
+      if (!q) return;
+      queryInput.value = "";
+      sendBtn.disabled = true;
+
+      addBubble("user", escapeHtml(q));
+      const thinking = addBubble("bot thinking", "Thinking...");
+
+      try {
+        const res = await fetch(`${API}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q }),
+        });
+        const data = await res.json();
+
+        let html = `<div>${escapeHtml(data.answer)}</div>`;
+        if (data.sources && data.sources.length > 0) {
+          html += `<div class="sources"><strong>Sources:</strong>`;
+          for (const s of data.sources) {
+            if (s.content) {
+              html += `<div class="source-item"><code>${escapeHtml(s.source)}</code> (score: ${s.score}) — ${escapeHtml(s.content.slice(0, 120))}...</div>`;
+            }
+          }
+          html += `</div>`;
+        }
+        thinking.className = "bubble bot";
+        thinking.innerHTML = html;
+      } catch (e) {
+        thinking.className = "bubble bot error";
+        thinking.textContent = "Error: " + e.message;
+      }
+
+      sendBtn.disabled = false;
+      queryInput.focus();
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    queryInput.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+  </script>
+</body>
+</html>
