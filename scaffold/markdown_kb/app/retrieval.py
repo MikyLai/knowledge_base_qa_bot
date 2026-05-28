@@ -6,18 +6,13 @@ from langchain_openai import ChatOpenAI
 from . import indexer
 
 
-SYSTEM_PROMPT = """
-# TODO: Write the system prompt for the knowledge base Q&A assistant.
-#
-# Design decision: Hallucination defense for raw Markdown context.
-#
-# Hints:
-# 1. Only answer using the provided CONTEXT.
-# 2. Cite only exact source IDs shown in [Source: ...].
-#    Each source ID uses filename#heading format.
-# 3. Define fallback behavior when the context lacks the answer.
-# 4. Explicitly prohibit guessing or outside knowledge.
-"""
+SYSTEM_PROMPT = """You are a helpful customer support assistant.
+Answer ONLY using the information in the CONTEXT below.
+For each fact you state, cite the source ID exactly as shown in [Source: ...].
+Source IDs use the format filename#heading.
+If the context does not contain enough information to answer, reply:
+"I cannot confirm that from the knowledge base."
+Do NOT guess, infer, or use any knowledge outside the provided context."""
 
 _llm = None
 
@@ -43,7 +38,14 @@ def build_prompt(query: str, ranked_sections: list) -> str:
     # 2. Include heading_path so the model sees the document structure.
     # 3. Include only top sections passed into this function.
     # 4. Place CONTEXT before QUESTION.
-    return f"CONTEXT:\n(no context)\n\nQUESTION:\n{query}"
+    context_parts = []
+    for section, _score in ranked_sections:
+        breadcrumb = " > ".join(section.heading_path)
+        context_parts.append(
+            f"[Source: {section.id}]\n({breadcrumb})\n{section.content}"
+        )
+    context = "\n\n".join(context_parts)
+    return f"CONTEXT:\n{context}\n\nQUESTION:\n{query}"
 
 
 def query(question: str) -> dict:

@@ -148,14 +148,14 @@ def rebuild_stats() -> None:
 
 
 def load_index_json(index_path: Path = INDEX_PATH) -> tuple[int, int]:
-    # TODO: Load .kb/index.json into the in-memory sections list.
-    #
-    # Hints:
-    # 1. If index_path does not exist, return (0, 0).
-    # 2. Read payload["sections"] and convert each item back to Section.
-    # 3. Call rebuild_stats() after assigning sections.
-    # 4. Return (files_indexed, sections_indexed).
-    return 0, 0
+    global sections
+    if not index_path.exists():
+        return 0, 0
+    with open(index_path) as f:
+        payload = json.load(f)
+    sections = [Section(**item) for item in payload["sections"]]
+    rebuild_stats()
+    return files_indexed, len(sections)
 
 
 def build_index(docs_dir: Path = DOCS_DIR) -> tuple[int, int]:
