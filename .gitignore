@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+vendor/
 .env
 
 # SQLite
@@ -20,3 +21,4 @@ knowledge_base_qa_bot/answers/
 .DS_Store
 .vscode/
 .idea/
+

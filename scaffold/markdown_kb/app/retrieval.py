@@ -48,6 +48,9 @@ def build_prompt(query: str, ranked_sections: list) -> str:
     return f"CONTEXT:\n{context}\n\nQUESTION:\n{query}"
 
 
+SCORE_THRESHOLD = 1.0
+
+
 def query(question: str) -> dict:
     if not indexer.sections:
         return {
@@ -56,9 +59,10 @@ def query(question: str) -> dict:
         }
 
     ranked_sections = indexer.search(question, k=3)
+    ranked_sections = [(s, score) for s, score in ranked_sections if score >= SCORE_THRESHOLD]
     if not ranked_sections:
         return {
-            "answer": "I cannot confirm from the knowledge base.",
+            "answer": "I cannot confirm that from the knowledge base.",
             "sources": [],
         }
 

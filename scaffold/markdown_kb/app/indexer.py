@@ -1,4 +1,5 @@
 import math
+import os
 import re # Regular Expression
 from collections import Counter
 from dataclasses import dataclass
@@ -6,8 +7,10 @@ import json
 from pathlib import Path
 
 
-DOCS_DIR = Path(__file__).resolve().parents[3] / "docs"
-INDEX_PATH = Path(__file__).resolve().parents[3] / ".kb" / "index.json"
+_kb_root_env = os.environ.get("KB_ROOT")
+_root = Path(_kb_root_env) if _kb_root_env else Path(__file__).resolve().parents[3]
+DOCS_DIR = _root / "docs"
+INDEX_PATH = _root / ".kb" / "index.json"
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 STOP_WORDS = {
