@@ -1,0 +1,82 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+    
+concurrency:
+  group: build-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump_version.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v6
+     
+      - name: bump version and push tag
+        uses: anothrNick/github-tag-action@v1
+        id: bump_version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCHES: main
+          PRERELEASE: true
+          WITH_V: ${{ github.ref == 'refs/heads/main' && true || false }}
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+        packages: write
+    needs: tag
+
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      POETRY_VIRTUALENVS_IN_PROJECT: "true"
+      PUBLISH_VERSION: ${{ github.ref == 'refs/heads/main' && needs.tag.outputs.tag || format('v{0}', needs.tag.outputs.tag) }}-${{ github.run_number }}
+      PYPI_VERSION: ${{ github.ref == 'refs/heads/main' && format('{0}.{1}', needs.tag.outputs.tag, github.run_number) || format('{0}.post.{1}', needs.tag.outputs.tag, github.run_number) }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+        
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --target vendor/
+    
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute lowercase image name
+        id: image_name
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "### Docker Image" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`ghcr.io/${GITHUB_REPOSITORY,,}:${{ env.PUBLISH_VERSION }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+            context: .
+            file: scaffold/markdown_kb/Dockerfile
+            push: true
+            tags: ${{ steps.image_name.outputs.name }}:${{ env.PUBLISH_VERSION }}
+            
+
+      
+      
